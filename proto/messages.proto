@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package smartcity;
+option go_package = "./pb";
+
+// -------------------------
+// Mensagens de Descoberta
+// -------------------------
+
+message DiscoveryRequest {
+    string gateway_ip = 1;
+    int32 gateway_udp_port = 2; // Porta onde o gateway recebe as leituras
+    int32 gateway_tcp_port = 3; // Porta TCP do gateway para registro e controle
+}
+
+message DiscoveryResponse {
+    string source_id = 1;
+    string type = 2; // ex: "camera", "poste_iluminacao", "semaforo", "qualidade_ar", "temperatura"
+    string ip = 3;
+    int32 tcp_port = 4; // Porta TCP para controle da fonte (0 se não controlável)
+    string initial_state = 5; // Estado inicial formatado
+}
+
+// -------------------------
+// Mensagens de Leitura
+// -------------------------
+
+message DataReading {
+    string source_id = 1;
+    string type = 2;
+    double value = 3;
+    string unit = 4;
+    int64 timestamp = 5;
+}
+
+// -------------------------
+// Mensagens de Controle
+// -------------------------
+
+message ControlCommand {
+    string source_id = 1; // ID da fonte a ser controlada
+    string command = 2; // ex: "LIGAR", "DESLIGAR", "MUDAR_ESTADO"
+    string parameter = 3; // parâmetro opcional, ex: "verde", "1080p"
+}
+
+message ControlResponse {
+    string source_id = 1;
+    bool success = 2;
+    string message = 3;
+}
+
+// -------------------------
+// Mensagens Cliente <-> Gateway
+// -------------------------
+
+message ClientRequest {
+    enum RequestType {
+        LIST_SOURCES = 0;
+        CONTROL_COMMAND = 1;
+        GET_HISTORY = 2;
+        GET_AGGREGATION = 3;
+    }
+    RequestType type = 1;
+    
+    // Para CONTROL_COMMAND
+    ControlCommand control_command = 2;
+    
+    // Para GET_HISTORY / GET_AGGREGATION
+    string filter_type = 3;
+}
+
+message SourceInfo {
+    string source_id = 1;
+    string type = 2;
+    string state = 3;
+}
+
+message ClientResponse {
+    bool success = 1;
+    string message = 2;
+    repeated SourceInfo sources = 3; // Para LIST_SOURCES
+    
+    // Para GET_HISTORY
+    repeated DataReading history = 4;
+    
+    // Para GET_AGGREGATION
+    double aggregation_result = 5;
+}

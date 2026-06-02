@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: iot_gateway
+    command: python gateway/main.py
+    volumes:
+      - shared-data:/app/data
+    networks:
+      iot_net:
+        ipv4_address: 172.20.0.10
+
+  temperatura:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: iot_temperatura
+    command: python sources/temperatura/main.py
+    networks:
+      - iot_net
+    depends_on:
+      - gateway
+
+  qualidade_ar:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: iot_qualidade_ar
+    command: python sources/qualidade_ar/main.py
+    networks:
+      - iot_net
+    depends_on:
+      - gateway
+
+  camera:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: iot_camera
+    command: python sources/camera/main.py
+    networks:
+      - iot_net
+    depends_on:
+      - gateway
+
+  poste:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: iot_poste
+    command: python sources/poste_iluminacao/main.py
+    networks:
+      - iot_net
+    depends_on:
+      - gateway
+
+  semaforo:
+    build:
+      context: .
+      dockerfile: Dockerfile.go
+    container_name: iot_semaforo
+    networks:
+      - iot_net
+    depends_on:
+      - gateway
+
+  dashboard-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    container_name: iot_dashboard_api
+    command: python dashboard/api.py
+    environment:
+      - GATEWAY_IP=172.20.0.10
+    ports:
+      - "8000:8000"
+    volumes:
+      - shared-data:/app/data
+    networks:
+      - iot_net
+    depends_on:
+      - gateway
+
+  dashboard-web:
+    build:
+      context: ./dashboard/web
+      dockerfile: Dockerfile
+    container_name: iot_dashboard_web
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api
+    networks:
+      - iot_net
+    depends_on:
+      - dashboard-api
+
+networks:
+  iot_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  shared-data:
