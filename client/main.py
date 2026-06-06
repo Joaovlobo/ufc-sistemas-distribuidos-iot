@@ -97,7 +97,7 @@ def consultar_historico():
         print("Falha ao obter histórico.")
 
 def consultar_agregacao():
-    print("\n=== Consulta Agregada (Média) ===")
+    print("\n=== Consulta Média ===")
     tipo = input("Tipo de fonte para agregação (ex: temperatura, qualidade_ar): ")
     if not tipo:
         print("Tipo é obrigatório.")
@@ -122,7 +122,7 @@ def main():
         print("1. Listar Fontes")
         print("2. Enviar Comando de Controle")
         print("3. Consultar Histórico (Últimos 50)")
-        print("4. Consultar Agregação (Média)")
+        print("4. Consultar Agregação (Média por Tipo)")
         print("5. Sair")
         
         op = input("\nEscolha uma opção: ")
