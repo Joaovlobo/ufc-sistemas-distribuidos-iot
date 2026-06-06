@@ -106,17 +106,17 @@ Uma característica crucial de sistemas distribuídos robustos é o tratamento t
 Os sensores `sensor_temp_01` e `sensor_ar_01` possuem uma thread que injeta falhas físicas intermitentes. Em 10% das execuções de envio de telemetria, os sensores entram em um travamento síncrono (`sleep` por 20 segundos). Durante esse intervalo, as comunicações de rede UDP com o Gateway cessam.
 
 ### 2. O Watchdog do Gateway
-No Gateway, uma thread dedicada executa em segundo plano a cada 5 segundos analisando o campo `last_seen` (timestamp de recepção ativa) registrado na memória RAM para as fontes monitoradas (`sensor_temp_01` e `sensor_ar_01`).
-* Se o Gateway não receber nenhuma mensagem de um determinado sensor por mais de **15 segundos**, ele declara a fonte como **`OFFLINE`**.
+No Gateway, uma thread dedicada executa em segundo plano a cada 5 segundos analisando o campo `last_seen` (timestamp de recepção ativa) registrado na memória RAM para **todas as fontes monitoradas** na rede.
+* Se o Gateway não receber nenhuma mensagem (seja telemetria ou heartbeat) de um determinado sensor/atuador por mais de **15 segundos**, ele declara a fonte como **`OFFLINE`**.
 * O Gateway então grava ativamente no arquivo de dados históricos CSV (`data/dados_gateway.csv`) um registro de inatividade:
   * O campo `value` é definido como `0.0`.
   * O campo `unit` é preenchido com a string sentinela **`OFFLINE`**.
 
-### 3. Renderização Gráfica de Quedas (Line Breaks / Null Gaps)
-No front-end React, a API formata os logs sentinela para o Recharts:
-* Leituras que possuem `unit === 'OFFLINE'` são mapeadas para o valor especial `null` de JavaScript.
-* O componente `<Area>` do Recharts é configurado com a propriedade **`connectNulls={false}`**.
-* Ao renderizar o gráfico histórico de série temporal, a linha não cai para 0 (o que geraria uma falsa medição de 0°C ou 0ppm). Em vez disso, a linha do gráfico **se rompe fisicamente**, deixando um intervalo em branco indicando explicitamente a ausência de dados do sensor naquele momento de falha.
+### 3. Heartbeats e Tolerância a Queda do Servidor
+Seguindo o rigor de arquiteturas distribuídas connectionless, os nós implementam um **Timeout Passivo** baseado em Discovery:
+* Os nós esperam pacotes `DiscoveryRequest` do Gateway a cada 30 segundos.
+* Se o Gateway cair, os dispositivos esbarram num limite de **35 segundos**. Eles pausam inteligentemente os envios UDP para poupar banda local e aguardam até o Gateway reviver.
+* Atuadores (mesmo físicos "Desligados") enviam pings de status a cada 10s para manterem sua presença ativa no Watchdog.
 * O painel exibe uma métrica dinâmica chamada **"Taxa de Falhas (Uptime)"**, calculada como:
   $$\text{Taxa de Falhas (\%)} = \frac{\text{Amostras OFFLINE}}{\text{Total de Amostras}} \times 100$$
 

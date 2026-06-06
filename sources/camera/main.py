@@ -34,17 +34,25 @@ class CameraSource:
         mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
+        sock.settimeout(35.0)
+
         print(f"[*] {SOURCE_ID} aguardando discovery do Gateway...")
         while self.running:
-            data, addr = sock.recvfrom(4096)
-            msg_type = data[0]
-            if msg_type == 0: # DiscoveryRequest
-                req = messages_pb2.DiscoveryRequest()
-                req.ParseFromString(data[1:])
-                self.gateway_ip = req.gateway_ip
-                self.gateway_udp_port = req.gateway_udp_port
-                print(f"[+] Gateway descoberto: {self.gateway_ip}:{self.gateway_udp_port}")
-                self.register_with_gateway()
+            try:
+                data, addr = sock.recvfrom(4096)
+                msg_type = data[0]
+                if msg_type == 0: # DiscoveryRequest
+                    req = messages_pb2.DiscoveryRequest()
+                    req.ParseFromString(data[1:])
+                    self.gateway_ip = req.gateway_ip
+                    self.gateway_udp_port = req.gateway_udp_port
+                    print(f"[+] Gateway descoberto: {self.gateway_ip}:{self.gateway_udp_port}")
+                    self.register_with_gateway()
+            except socket.timeout:
+                if self.gateway_ip is not None:
+                    print(f"[-] Gateway offline (timeout de discovery). Aguardando...")
+                    self.gateway_ip = None
+                    self.gateway_udp_port = None
 
     def register_with_gateway(self):
         resp = messages_pb2.DiscoveryResponse()
@@ -109,11 +117,11 @@ class CameraSource:
     def send_readings(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         while self.running:
-            if self.gateway_ip and self.gateway_udp_port and self.state == "LIGADO":
+            if self.gateway_ip and self.gateway_udp_port:
                 reading = messages_pb2.DataReading()
                 reading.source_id = SOURCE_ID
                 reading.type = SOURCE_TYPE
-                reading.value = 1.0 # 1.0 indica frame capturado
+                reading.value = 1.0 if self.state == "LIGADO" else 0.0
                 reading.unit = "frame"
                 reading.timestamp = int(time.time())
                 

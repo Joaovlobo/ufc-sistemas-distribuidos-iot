@@ -32,17 +32,25 @@ class PosteIluminacao:
         mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
+        sock.settimeout(35.0)
+
         print(f"[*] {SOURCE_ID} aguardando discovery do Gateway...")
         while self.running:
-            data, addr = sock.recvfrom(4096)
-            msg_type = data[0]
-            if msg_type == 0:
-                req = messages_pb2.DiscoveryRequest()
-                req.ParseFromString(data[1:])
-                self.gateway_ip = req.gateway_ip
-                self.gateway_udp_port = req.gateway_udp_port
-                print(f"[+] Gateway descoberto: {self.gateway_ip}:{self.gateway_udp_port}")
-                self.register_with_gateway()
+            try:
+                data, addr = sock.recvfrom(4096)
+                msg_type = data[0]
+                if msg_type == 0:
+                    req = messages_pb2.DiscoveryRequest()
+                    req.ParseFromString(data[1:])
+                    self.gateway_ip = req.gateway_ip
+                    self.gateway_udp_port = req.gateway_udp_port
+                    print(f"[+] Gateway descoberto: {self.gateway_ip}:{self.gateway_udp_port}")
+                    self.register_with_gateway()
+            except socket.timeout:
+                if self.gateway_ip is not None:
+                    print(f"[-] Gateway offline (timeout de discovery). Aguardando...")
+                    self.gateway_ip = None
+                    self.gateway_udp_port = None
 
     def register_with_gateway(self):
         resp = messages_pb2.DiscoveryResponse()
@@ -61,7 +69,7 @@ class PosteIluminacao:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.bind(('0.0.0.0', TCP_PORT))
         sock.listen(5)
-        print(f"[*] {SOURCE_ID} ouvindo comandos TCP na porta {TCP_PORT}")
+        #print(f"[*] {SOURCE_ID} ouvindo comandos TCP na porta {TCP_PORT}")
         
         while self.running:
             conn, addr = sock.accept()
@@ -103,11 +111,11 @@ class PosteIluminacao:
     def send_readings(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         while self.running:
-            if self.gateway_ip and self.gateway_udp_port and self.state == "LIGADO":
+            if self.gateway_ip and self.gateway_udp_port:
                 reading = messages_pb2.DataReading()
                 reading.source_id = SOURCE_ID
                 reading.type = SOURCE_TYPE
-                reading.value = self.intensidade
+                reading.value = self.intensidade if self.state == "LIGADO" else 0
                 reading.unit = "%"
                 reading.timestamp = int(time.time())
                 

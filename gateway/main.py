@@ -226,8 +226,6 @@ class Gateway:
             time.sleep(5)
             now = time.time()
             for sid, sdata in list(self.sources.items()):
-                if sid not in ('sensor_temp_01', 'sensor_ar_01'):
-                    continue
                 # Se não há contato há mais de 15 segundos
                 if now - sdata['last_seen'] > 15:
                     sdata['state'] = 'OFFLINE'

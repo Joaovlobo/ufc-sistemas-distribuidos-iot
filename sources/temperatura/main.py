@@ -27,24 +27,32 @@ class SensorTemperatura:
         mreq = struct.pack("4sl", socket.inet_aton(MULTICAST_GROUP), socket.INADDR_ANY)
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
+        sock.settimeout(35.0)
+
         print(f"[*] {SOURCE_ID} aguardando discovery do Gateway...")
         while self.running:
-            data, addr = sock.recvfrom(4096)
-            msg_type = data[0]
-            if msg_type == 0: # DiscoveryRequest
-                req = messages_pb2.DiscoveryRequest()
-                req.ParseFromString(data[1:])
-                self.gateway_ip = req.gateway_ip
-                self.gateway_udp_port = req.gateway_udp_port
-                print(f"[+] Gateway descoberto: {self.gateway_ip}:{self.gateway_udp_port}")
-                self.register_with_gateway()
+            try:
+                data, addr = sock.recvfrom(4096)
+                msg_type = data[0]
+                if msg_type == 0: # DiscoveryRequest
+                    req = messages_pb2.DiscoveryRequest()
+                    req.ParseFromString(data[1:])
+                    self.gateway_ip = req.gateway_ip
+                    self.gateway_udp_port = req.gateway_udp_port
+                    print(f"[+] Gateway descoberto: {self.gateway_ip}:{self.gateway_udp_port}")
+                    self.register_with_gateway()
+            except socket.timeout:
+                if self.gateway_ip is not None:
+                    print(f"[-] Gateway offline (timeout de discovery). Pausando envios...")
+                    self.gateway_ip = None
+                    self.gateway_udp_port = None
 
     def register_with_gateway(self):
         resp = messages_pb2.DiscoveryResponse()
         resp.source_id = SOURCE_ID
         resp.type = SOURCE_TYPE
         resp.ip = socket.gethostbyname(socket.gethostname())
-        resp.tcp_port = 0 # Não controlável
+        resp.tcp_port = 0 # nao controlável
         resp.initial_state = "Ativo"
         
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -54,8 +62,8 @@ class SensorTemperatura:
     def send_readings(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         while self.running:
-            # Simulação de Falha: 10% de chance de o sensor "travar" por 20 segundos
-            if SOURCE_ID == "sensor_temp_01" and random.random() < 0.10:
+            # simulação de Falha: 1% de chance de o sensor "travar" por 20 segundos
+            if SOURCE_ID == "sensor_temp_01" and random.random() < 0.01:
                 print("[!] ERRO SIMULADO: Falha de hardware detectada. Sensor inoperante...")
                 time.sleep(20)
                 print("[+] RECUPERADO: O sensor reiniciou e voltou a operar.")

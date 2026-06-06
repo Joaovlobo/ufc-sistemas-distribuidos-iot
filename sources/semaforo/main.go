@@ -50,9 +50,18 @@ func (s *Semaforo) listenForDiscovery() {
 	log.Printf("[*] %s aguardando discovery do Gateway...", SourceID)
 
 	for s.running {
+		conn.SetReadDeadline(time.Now().Add(35 * time.Second))
 		n, _, err := conn.ReadFromUDP(buf)
 		if err != nil {
-			log.Printf("Erro na leitura UDP: %v", err)
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				if s.gatewayIP != "" {
+					log.Println("[-] Gateway offline (timeout de discovery). Pausando envios...")
+					s.gatewayIP = ""
+					s.gatewayUDPPort = 0
+				}
+			} else {
+				log.Printf("Erro na leitura UDP: %v", err)
+			}
 			continue
 		}
 
@@ -241,10 +250,10 @@ func (s *Semaforo) runSemaphores() {
 				s.state = "verde"
 			}
 			
-			// Send reading (state update)
+			// send reading (state update)
 			if s.gatewayIP != "" {
-				s.registerWithGateway() // Registration updates state in gateway
-				s.sendReading()         // Send telemetry to dashboard analytics
+				s.registerWithGateway() // registrar updates state no gateway
+				s.sendReading()         // send telemetry para dashboard 
 			}
 		} else {
 			time.Sleep(2 * time.Second)
